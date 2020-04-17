@@ -5,6 +5,9 @@ const ejs = require("ejs");
 const express = require("express");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
+// const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 console.log(process.env.SECRET);
@@ -21,10 +24,10 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-userSchema.plugin(encrypt, {
-    secret: process.env.SECRET, 
-    encryptedFields: ['password'],
-});
+// userSchema.plugin(encrypt, {
+//     secret: process.env.SECRET, 
+//     encryptedFields: ['password'],
+// });
 
 const User = new mongoose.model("User", userSchema);
 
@@ -42,33 +45,49 @@ app.get("/register", (req, res)=>{
 });
 
 app.post("/register", (req, res)=>{
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
-    });
-    newUser.save((err)=>{
-        if(!err)
-        {    res.render("secrets");
-            console.log("Successfully Loged In");
-    }
-        else
-            console.log(err);
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });  
+        newUser.save((err)=>{
+            if(!err)
+            {    res.render("secrets");
+                console.log("Successfully Loged In");
+        }
+            else
+                console.log(err);
+        });  
+    
     });
 })
 
 app.post("/login", (req, res)=>{
     User.findOne({email: req.body.username}, (err, foundUser)=>{
-        console.log(foundUser)
-        if(foundUser.password === req.body.password)
-            res.render("secrets");
-        else{
-            res.send(err);
+        console.log(foundUser);
+        if(foundUser)
+        {
+            bcrypt.compare(req.body.password, foundUser.password, function(err, result) {
+                if(result){
+                    res.render("secrets");
+                    console.log(result);
+                }
+                else{
+                    console.log(err);
+                    console.log(result);
+                }
+            });
+            
         }
+        // if(foundUser.password === hash){
+        //     res.render("secrets");
+        // }
+        // else{
+        //     res.send(err);
+        // }
     });
 });
-
-
-
 
 app.listen(process.env.PORT || 3000, ()=>{
     console.log("Server Successfully running on PORT 3000");
